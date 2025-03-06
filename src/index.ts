@@ -1,232 +1,275 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { ethers } from "ethers";
 
-const NWS_API_BASE = "https://api.weather.gov";
-const USER_AGENT = "weather-app/1.0";
+// Sepolia testnet RPC URL - you can replace this with your own provider URL
+const SEPOLIA_RPC_URL = "https://eth-sepolia.g.alchemy.com/v2/h3KXY5AhC0kqn5_KWk2foLlsVsU6-Hh8";
 
 // Create server instance
 const server = new McpServer({
-  name: "weather",
+  name: "ethereum-sepolia",
   version: "1.0.0",
 });
 
-// Helper function for making NWS API requests
-async function makeNWSRequest<T>(url: string): Promise<T | null> {
-  const headers = {
-    "User-Agent": USER_AGENT,
-    Accept: "application/geo+json",
-  };
+// Initialize Ethereum provider
+let provider: ethers.JsonRpcProvider;
 
-  try {
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return (await response.json()) as T;
-  } catch (error) {
-    console.error("Error making NWS request:", error);
-    return null;
+// Helper function to ensure provider is initialized
+function getProvider(): ethers.JsonRpcProvider {
+  if (!provider) {
+    provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
   }
+  return provider;
 }
 
-interface AlertFeature {
-  properties: {
-    event?: string;
-    areaDesc?: string;
-    severity?: string;
-    status?: string;
-    headline?: string;
-  };
+// Helper function to format Ether values
+function formatEther(wei: bigint): string {
+  return ethers.formatEther(wei);
 }
 
-// Format alert data
-function formatAlert(feature: AlertFeature): string {
-  const props = feature.properties;
+// Helper function to format transaction data
+function formatTransaction(tx: ethers.TransactionResponse): string {
   return [
-    `Event: ${props.event || "Unknown"}`,
-    `Area: ${props.areaDesc || "Unknown"}`,
-    `Severity: ${props.severity || "Unknown"}`,
-    `Status: ${props.status || "Unknown"}`,
-    `Headline: ${props.headline || "No headline"}`,
-    "---",
-  ].join("\n");
+    `Transaction Hash: ${tx.hash}`,
+    `From: ${tx.from}`,
+    `To: ${tx.to || 'Contract Creation'}`,
+    `Value: ${formatEther(tx.value)} ETH`,
+    `Gas Price: ${tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : 'Unknown'} Gwei`,
+    `Nonce: ${tx.nonce}`,
+    `Block Number: ${tx.blockNumber || 'Pending'}`,
+    `Block Hash: ${tx.blockHash || 'Pending'}`,
+    `Transaction Index: ${tx.index !== undefined ? tx.index : 'Pending'}`,
+  ].join('\n');
 }
 
-interface ForecastPeriod {
-  name?: string;
-  temperature?: number;
-  temperatureUnit?: string;
-  windSpeed?: string;
-  windDirection?: string;
-  shortForecast?: string;
+// Helper function to format block data
+function formatBlock(block: ethers.Block): string {
+  return [
+    `Block Number: ${block.number}`,
+    `Block Hash: ${block.hash}`,
+    `Timestamp: ${new Date(Number(block.timestamp) * 1000).toISOString()}`,
+    `Miner: ${block.miner}`,
+    `Gas Limit: ${block.gasLimit.toString()}`,
+    `Gas Used: ${block.gasUsed.toString()}`,
+    `Transaction Count: ${block.transactions.length}`,
+    `Parent Hash: ${block.parentHash}`,
+  ].join('\n');
 }
 
-interface AlertsResponse {
-  features: AlertFeature[];
-}
-
-interface PointsResponse {
-  properties: {
-    forecast?: string;
-  };
-}
-
-interface ForecastResponse {
-  properties: {
-    periods: ForecastPeriod[];
-  };
-}
-
-// Register weather tools
+// Register Ethereum Sepolia tools
 server.tool(
-  "get-alerts",
-  "Get weather alerts for a state",
+  "get-eth-balance",
+  "Get ETH balance for an Ethereum address on Sepolia testnet",
   {
-    state: z.string().length(2).describe("Two-letter state code (e.g. CA, NY)"),
+    address: z.string().describe("Ethereum address to check balance for"),
   },
-  async ({ state }) => {
-    const stateCode = state.toUpperCase();
-    const alertsUrl = `${NWS_API_BASE}/alerts?area=${stateCode}`;
-    const alertsData = await makeNWSRequest<AlertsResponse>(alertsUrl);
-
-    if (!alertsData) {
+  async ({ address }) => {
+    try {
+      const provider = getProvider();
+      const balance = await provider.getBalance(address);
+      
       return {
         content: [
           {
             type: "text",
-            text: "Failed to retrieve alerts data",
+            text: `Balance for ${address}: ${formatEther(balance)} ETH`,
           },
         ],
       };
-    }
-
-    const features = alertsData.features || [];
-    if (features.length === 0) {
+    } catch (error) {
+      console.error("Error getting balance:", error);
       return {
         content: [
           {
             type: "text",
-            text: `No active alerts for ${stateCode}`,
+            text: `Failed to retrieve balance for address: ${address}. Error: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
       };
     }
-
-    const formattedAlerts = features.map(formatAlert);
-    const alertsText = `Active alerts for ${stateCode}:\n\n${formattedAlerts.join(
-      "\n"
-    )}`;
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: alertsText,
-        },
-      ],
-    };
   }
 );
 
 server.tool(
-  "get-forecast",
-  "Get weather forecast for a location",
+  "get-latest-block",
+  "Get information about the latest block on Sepolia testnet",
+  {},
+  async () => {
+    try {
+      const provider = getProvider();
+      const block = await provider.getBlock("latest");
+      
+      if (!block) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Failed to retrieve latest block information",
+            },
+          ],
+        };
+      }
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: formatBlock(block),
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error getting latest block:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to retrieve latest block information. Error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+server.tool(
+  "get-transaction",
+  "Get information about a transaction on Sepolia testnet",
   {
-    latitude: z.number().min(-90).max(90).describe("Latitude of the location"),
-    longitude: z
-      .number()
-      .min(-180)
-      .max(180)
-      .describe("Longitude of the location"),
+    txHash: z.string().describe("Transaction hash to look up"),
   },
-  async ({ latitude, longitude }) => {
-    // Get grid point data
-    const pointsUrl = `${NWS_API_BASE}/points/${latitude.toFixed(
-      4
-    )},${longitude.toFixed(4)}`;
-    const pointsData = await makeNWSRequest<PointsResponse>(pointsUrl);
-
-    if (!pointsData) {
+  async ({ txHash }) => {
+    try {
+      const provider = getProvider();
+      const tx = await provider.getTransaction(txHash);
+      
+      if (!tx) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Transaction not found: ${txHash}`,
+            },
+          ],
+        };
+      }
+      
       return {
         content: [
           {
             type: "text",
-            text: `Failed to retrieve grid point data for coordinates: ${latitude}, ${longitude}. This location may not be supported by the NWS API (only US locations are supported).`,
+            text: formatTransaction(tx),
           },
         ],
       };
-    }
-
-    const forecastUrl = pointsData.properties?.forecast;
-    if (!forecastUrl) {
+    } catch (error) {
+      console.error("Error getting transaction:", error);
       return {
         content: [
           {
             type: "text",
-            text: "Failed to get forecast URL from grid point data",
+            text: `Failed to retrieve transaction information for hash: ${txHash}. Error: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
       };
     }
+  }
+);
 
-    // Get forecast data
-    const forecastData = await makeNWSRequest<ForecastResponse>(forecastUrl);
-    if (!forecastData) {
+server.tool(
+  "get-gas-price",
+  "Get current gas price on Sepolia testnet",
+  {},
+  async () => {
+    try {
+      const provider = getProvider();
+      const gasPrice = await provider.getFeeData();
+      
       return {
         content: [
           {
             type: "text",
-            text: "Failed to retrieve forecast data",
+            text: [
+              "Current Gas Prices on Sepolia:",
+              `Gas Price: ${gasPrice.gasPrice ? ethers.formatUnits(gasPrice.gasPrice, 'gwei') : 'Unknown'} Gwei`,
+              `Max Fee Per Gas: ${gasPrice.maxFeePerGas ? ethers.formatUnits(gasPrice.maxFeePerGas, 'gwei') : 'Unknown'} Gwei`,
+              `Max Priority Fee Per Gas: ${gasPrice.maxPriorityFeePerGas ? ethers.formatUnits(gasPrice.maxPriorityFeePerGas, 'gwei') : 'Unknown'} Gwei`,
+            ].join('\n'),
           },
         ],
       };
-    }
-
-    const periods = forecastData.properties?.periods || [];
-    if (periods.length === 0) {
+    } catch (error) {
+      console.error("Error getting gas price:", error);
       return {
         content: [
           {
             type: "text",
-            text: "No forecast periods available",
+            text: `Failed to retrieve gas price information. Error: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
       };
     }
+  }
+);
 
-    // Format forecast periods
-    const formattedForecast = periods.map((period: ForecastPeriod) =>
-      [
-        `${period.name || "Unknown"}:`,
-        `Temperature: ${period.temperature || "Unknown"}°${
-          period.temperatureUnit || "F"
-        }`,
-        `Wind: ${period.windSpeed || "Unknown"} ${period.windDirection || ""}`,
-        `${period.shortForecast || "No forecast available"}`,
-        "---",
-      ].join("\n")
-    );
-
-    const forecastText = `Forecast for ${latitude}, ${longitude}:\n\n${formattedForecast.join(
-      "\n"
-    )}`;
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: forecastText,
-        },
-      ],
-    };
+server.tool(
+  "get-erc20-balance",
+  "Get ERC20 token balance for an address on Sepolia testnet",
+  {
+    tokenAddress: z.string().describe("ERC20 token contract address"),
+    walletAddress: z.string().describe("Wallet address to check balance for"),
+  },
+  async ({ tokenAddress, walletAddress }) => {
+    try {
+      const provider = getProvider();
+      
+      // ERC20 standard balanceOf ABI
+      const erc20Abi = [
+        "function balanceOf(address owner) view returns (uint256)",
+        "function decimals() view returns (uint8)",
+        "function symbol() view returns (string)",
+        "function name() view returns (string)"
+      ];
+      
+      const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, provider);
+      
+      // Get token details and balance
+      const [balance, decimals, symbol, name] = await Promise.all([
+        tokenContract.balanceOf(walletAddress),
+        tokenContract.decimals(),
+        tokenContract.symbol(),
+        tokenContract.name()
+      ]);
+      
+      const formattedBalance = ethers.formatUnits(balance, decimals);
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Token: ${name} (${symbol})\nBalance for ${walletAddress}: ${formattedBalance} ${symbol}`,
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error getting ERC20 balance:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to retrieve ERC20 token balance. Error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
   }
 );
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Weather MCP Server running on stdio");
+  console.error("Ethereum Sepolia MCP Server running on stdio");
 }
 
 main().catch((error) => {
