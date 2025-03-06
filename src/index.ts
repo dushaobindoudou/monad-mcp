@@ -3,12 +3,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { ethers } from "ethers";
 
-// Sepolia testnet RPC URL - you can replace this with your own provider URL
-const SEPOLIA_RPC_URL = "https://eth-sepolia.g.alchemy.com/v2/h3KXY5AhC0kqn5_KWk2foLlsVsU6-Hh8";
+// Monad testnet RPC URL - you can replace this with your own provider URL
+const MONAD_TESTNET_RPC_URL = "https://testnet-rpc.monad.xyz/";
 
 // Create server instance
 const server = new McpServer({
-  name: "ethereum-sepolia",
+  name: "monad-testnet",
   version: "1.0.0",
 });
 
@@ -18,7 +18,7 @@ let provider: ethers.JsonRpcProvider;
 // Helper function to ensure provider is initialized
 function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
-    provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
+    provider = new ethers.JsonRpcProvider(MONAD_TESTNET_RPC_URL);
   }
   return provider;
 }
@@ -34,7 +34,7 @@ function formatTransaction(tx: ethers.TransactionResponse): string {
     `Transaction Hash: ${tx.hash}`,
     `From: ${tx.from}`,
     `To: ${tx.to || 'Contract Creation'}`,
-    `Value: ${formatEther(tx.value)} ETH`,
+    `Value: ${formatEther(tx.value)} MON`,
     `Gas Price: ${tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : 'Unknown'} Gwei`,
     `Nonce: ${tx.nonce}`,
     `Block Number: ${tx.blockNumber || 'Pending'}`,
@@ -57,12 +57,12 @@ function formatBlock(block: ethers.Block): string {
   ].join('\n');
 }
 
-// Register Ethereum Sepolia tools
+// Register Monad testnet tools
 server.tool(
-  "get-eth-balance",
-  "Get ETH balance for an Ethereum address on Sepolia testnet",
+  "get-mon-balance",
+  "Get MON balance for an address on Monad testnet",
   {
-    address: z.string().describe("Ethereum address to check balance for"),
+    address: z.string().describe("Monad testnet address to check balance for"),
   },
   async ({ address }) => {
     try {
@@ -73,7 +73,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Balance for ${address}: ${formatEther(balance)} ETH`,
+            text: `Balance for ${address}: ${formatEther(balance)} MON`,
           },
         ],
       };
@@ -93,7 +93,7 @@ server.tool(
 
 server.tool(
   "get-latest-block",
-  "Get information about the latest block on Sepolia testnet",
+  "Get information about the latest block on Monad testnet",
   {},
   async () => {
     try {
@@ -135,7 +135,7 @@ server.tool(
 
 server.tool(
   "get-transaction",
-  "Get information about a transaction on Sepolia testnet",
+  "Get information about a transaction on Monad testnet",
   {
     txHash: z.string().describe("Transaction hash to look up"),
   },
@@ -179,7 +179,7 @@ server.tool(
 
 server.tool(
   "get-gas-price",
-  "Get current gas price on Sepolia testnet",
+  "Get current gas price on Monad testnet",
   {},
   async () => {
     try {
@@ -191,7 +191,7 @@ server.tool(
           {
             type: "text",
             text: [
-              "Current Gas Prices on Sepolia:",
+              "Current Gas Prices on Monad testnet:",
               `Gas Price: ${gasPrice.gasPrice ? ethers.formatUnits(gasPrice.gasPrice, 'gwei') : 'Unknown'} Gwei`,
               `Max Fee Per Gas: ${gasPrice.maxFeePerGas ? ethers.formatUnits(gasPrice.maxFeePerGas, 'gwei') : 'Unknown'} Gwei`,
               `Max Priority Fee Per Gas: ${gasPrice.maxPriorityFeePerGas ? ethers.formatUnits(gasPrice.maxPriorityFeePerGas, 'gwei') : 'Unknown'} Gwei`,
@@ -215,7 +215,7 @@ server.tool(
 
 server.tool(
   "get-erc20-balance",
-  "Get ERC20 token balance for an address on Sepolia testnet",
+  "Get ERC20 token balance for an address on Monad testnet",
   {
     tokenAddress: z.string().describe("ERC20 token contract address"),
     walletAddress: z.string().describe("Wallet address to check balance for"),
@@ -269,7 +269,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Ethereum Sepolia MCP Server running on stdio");
+  console.error("Monad testnet MCP Server running on stdio");
 }
 
 main().catch((error) => {
