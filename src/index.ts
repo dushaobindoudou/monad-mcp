@@ -1,63 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { ethers } from "ethers";
+import { createPublicClient, formatUnits, getContract, http, stringify } from "viem";
+import {  monadTestnet } from "./constants.js";
 
-// Monad testnet RPC URL - you can replace this with your own provider URL
-const MONAD_TESTNET_RPC_URL = "https://testnet-rpc.monad.xyz/";
-
-// Create server instance
 const server = new McpServer({
   name: "monad-testnet",
-  version: "1.0.0",
+  version: "0.0.1",
 });
 
-// Initialize Ethereum provider
-let provider: ethers.JsonRpcProvider;
+const publicClient = createPublicClient({
+  chain: monadTestnet,
+  transport: http(),
+});
 
-// Helper function to ensure provider is initialized
-function getProvider(): ethers.JsonRpcProvider {
-  if (!provider) {
-    provider = new ethers.JsonRpcProvider(MONAD_TESTNET_RPC_URL);
-  }
-  return provider;
-}
-
-// Helper function to format Ether values
-function formatEther(wei: bigint): string {
-  return ethers.formatEther(wei);
-}
-
-// Helper function to format transaction data
-function formatTransaction(tx: ethers.TransactionResponse): string {
-  return [
-    `Transaction Hash: ${tx.hash}`,
-    `From: ${tx.from}`,
-    `To: ${tx.to || 'Contract Creation'}`,
-    `Value: ${formatEther(tx.value)} MON`,
-    `Gas Price: ${tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : 'Unknown'} Gwei`,
-    `Nonce: ${tx.nonce}`,
-    `Block Number: ${tx.blockNumber || 'Pending'}`,
-    `Block Hash: ${tx.blockHash || 'Pending'}`,
-    `Transaction Index: ${tx.index !== undefined ? tx.index : 'Pending'}`,
-  ].join('\n');
-}
-
-// Helper function to format block data
-function formatBlock(block: ethers.Block): string {
-  return [
-    `Block Number: ${block.number}`,
-    `Block Hash: ${block.hash}`,
-    `Timestamp: ${new Date(Number(block.timestamp) * 1000).toISOString()}`,
-    `Miner: ${block.miner}`,
-    `Gas Limit: ${block.gasLimit.toString()}`,
-    `Gas Used: ${block.gasUsed.toString()}`,
-    `Transaction Count: ${block.transactions.length}`,
-    `Parent Hash: ${block.parentHash}`,
-  ].join('\n');
-}
-
-// Register Monad testnet tools
 server.tool(
   "get-mon-balance",
   "Get MON balance for an address on Monad testnet",
@@ -66,14 +22,15 @@ server.tool(
   },
   async ({ address }) => {
     try {
-      const provider = getProvider();
-      const balance = await provider.getBalance(address);
-      
+      const balance = await publicClient.getBalance({
+        address: address as `0x${string}`,
+      });
+
       return {
         content: [
           {
             type: "text",
-            text: `Balance for ${address}: ${formatEther(balance)} MON`,
+            text: `Balance for ${address}: ${balance.toString()} MON`,
           },
         ],
       };
@@ -83,7 +40,9 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Failed to retrieve balance for address: ${address}. Error: ${error instanceof Error ? error.message : String(error)}`,
+            text: `Failed to retrieve balance for address: ${address}. Error: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           },
         ],
       };
@@ -97,9 +56,8 @@ server.tool(
   {},
   async () => {
     try {
-      const provider = getProvider();
-      const block = await provider.getBlock("latest");
-      
+      const block = await publicClient.getBlock();
+
       if (!block) {
         return {
           content: [
@@ -110,12 +68,12 @@ server.tool(
           ],
         };
       }
-      
+
       return {
         content: [
           {
             type: "text",
-            text: formatBlock(block),
+            text: stringify(block, null, 2),
           },
         ],
       };
@@ -125,7 +83,9 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Failed to retrieve latest block information. Error: ${error instanceof Error ? error.message : String(error)}`,
+            text: `Failed to retrieve latest block information. Error: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           },
         ],
       };
@@ -141,9 +101,10 @@ server.tool(
   },
   async ({ txHash }) => {
     try {
-      const provider = getProvider();
-      const tx = await provider.getTransaction(txHash);
-      
+      const tx = await publicClient.getTransaction({
+        hash: txHash as `0x${string}`,
+      });
+
       if (!tx) {
         return {
           content: [
@@ -154,12 +115,12 @@ server.tool(
           ],
         };
       }
-      
+
       return {
         content: [
           {
             type: "text",
-            text: formatTransaction(tx),
+            text: stringify(tx, null, 2),
           },
         ],
       };
@@ -169,43 +130,9 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Failed to retrieve transaction information for hash: ${txHash}. Error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-      };
-    }
-  }
-);
-
-server.tool(
-  "get-gas-price",
-  "Get current gas price on Monad testnet",
-  {},
-  async () => {
-    try {
-      const provider = getProvider();
-      const gasPrice = await provider.getFeeData();
-      
-      return {
-        content: [
-          {
-            type: "text",
-            text: [
-              "Current Gas Prices on Monad testnet:",
-              `Gas Price: ${gasPrice.gasPrice ? ethers.formatUnits(gasPrice.gasPrice, 'gwei') : 'Unknown'} Gwei`,
-              `Max Fee Per Gas: ${gasPrice.maxFeePerGas ? ethers.formatUnits(gasPrice.maxFeePerGas, 'gwei') : 'Unknown'} Gwei`,
-              `Max Priority Fee Per Gas: ${gasPrice.maxPriorityFeePerGas ? ethers.formatUnits(gasPrice.maxPriorityFeePerGas, 'gwei') : 'Unknown'} Gwei`,
-            ].join('\n'),
-          },
-        ],
-      };
-    } catch (error) {
-      console.error("Error getting gas price:", error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Failed to retrieve gas price information. Error: ${error instanceof Error ? error.message : String(error)}`,
+            text: `Failed to retrieve transaction information for hash: ${txHash}. Error: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           },
         ],
       };
@@ -222,28 +149,29 @@ server.tool(
   },
   async ({ tokenAddress, walletAddress }) => {
     try {
-      const provider = getProvider();
-      
       // ERC20 standard balanceOf ABI
       const erc20Abi = [
         "function balanceOf(address owner) view returns (uint256)",
         "function decimals() view returns (uint8)",
         "function symbol() view returns (string)",
-        "function name() view returns (string)"
+        "function name() view returns (string)",
       ];
-      
-      const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, provider);
-      
-      // Get token details and balance
+
+      const contract = getContract({
+        address: tokenAddress as `0x${string}`,
+        abi: erc20Abi,
+        client: publicClient,
+      });
+
       const [balance, decimals, symbol, name] = await Promise.all([
-        tokenContract.balanceOf(walletAddress),
-        tokenContract.decimals(),
-        tokenContract.symbol(),
-        tokenContract.name()
+        contract.read.balanceOf([walletAddress]),
+        contract.read.decimals(),
+        contract.read.symbol(),
+        contract.read.name(),
       ]);
-      
-      const formattedBalance = ethers.formatUnits(balance, decimals);
-      
+
+      const formattedBalance = formatUnits(balance as bigint, decimals as number);
+
       return {
         content: [
           {
@@ -258,7 +186,9 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Failed to retrieve ERC20 token balance. Error: ${error instanceof Error ? error.message : String(error)}`,
+            text: `Failed to retrieve ERC20 token balance. Error: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           },
         ],
       };
