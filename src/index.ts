@@ -10,8 +10,6 @@ import {
 } from "viem";
 import { ERC20_ABI, monadTestnet } from "./constants.js";
 
-const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
-
 const server = new McpServer({
   name: "monad-testnet",
   version: "0.0.1",
@@ -26,13 +24,7 @@ server.tool(
   "get-mon-balance",
   "Get MON balance for an address on Monad testnet",
   {
-    address: z
-      .string()
-      .regex(
-        ethereumAddressRegex,
-        "Invalid Ethereum address format. Must be a 0x-prefixed 40-character hex string."
-      )
-      .describe("Monad testnet address to check balance for"),
+    address: z.string().describe("Monad testnet address to check balance for"),
   },
   async ({ address }) => {
     try {
@@ -68,13 +60,7 @@ server.tool(
   "get-transaction",
   "Get information about a transaction on Monad testnet",
   {
-    txHash: z
-      .string()
-      .regex(
-        /^0x[a-fA-F0-9]{64}$/,
-        "Invalid transaction hash format. Must be a 0x-prefixed 64-character hex string."
-      )
-      .describe("Transaction hash to look up"),
+    txHash: z.string().describe("Transaction hash to look up"),
   },
   async ({ txHash }) => {
     try {
@@ -121,20 +107,8 @@ server.tool(
   "get-erc20-balance",
   "Get ERC20 token balance for an address on Monad testnet",
   {
-    tokenAddress: z
-      .string()
-      .regex(
-        ethereumAddressRegex,
-        "Invalid token address format. Must be a 0x-prefixed 40-character hex string."
-      )
-      .describe("ERC20 token contract address"),
-    walletAddress: z
-      .string()
-      .regex(
-        ethereumAddressRegex,
-        "Invalid wallet address format. Must be a 0x-prefixed 40-character hex string."
-      )
-      .describe("Wallet address to check balance for"),
+    tokenAddress: z.string().describe("ERC20 token contract address"),
+    walletAddress: z.string().describe("Wallet address to check balance for"),
   },
   async ({ tokenAddress, walletAddress }) => {
     try {
