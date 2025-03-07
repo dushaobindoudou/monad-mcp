@@ -43,6 +43,28 @@ const MONAD_RPC_URL = "https://rpc.monad.xyz";
 
 For better reliability, consider using an RPC provider like Alchemy or QuickNode by replacing the URL with your own endpoint.
 
+## Claude Desktop Configuration
+
+To open the configuration file, open Claude Desktop and click on Claude on the taskbar.
+Then, click on the `Settings...` option.
+Then click on the `Developer` tab and click `Edit Config`.
+Open the config file with your favorite text editor and add the following configuration:
+Do not forget to replace `/PATH/TO/FOLDER` with the actual path to the folder containing the build directory.
+
+```json
+{
+  "mcpServers": {
+      "monad-testnet": {
+          "command": "node",
+          "args": [
+              "/PATH/TO/FOLDER/build/index.js"
+          ]
+      }
+  }
+}
+```
+
+
 ## License
 
 MIT
