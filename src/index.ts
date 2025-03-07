@@ -154,6 +154,109 @@ server.tool(
   }
 );
 
+server.tool(
+  "get-block",
+  "Get information about a specific block on Monad testnet",
+  {
+    blockNumber: z.union([
+      z.string().describe("Block number or 'latest' for most recent block"),
+      z.number().describe("Block number")
+    ]),
+  },
+  async ({ blockNumber }) => {
+    try {
+      const blockTag = blockNumber === 'latest' ? 'latest' : 
+        typeof blockNumber === 'string' ? BigInt(blockNumber) : BigInt(blockNumber);
+      const block = await publicClient.getBlock({ 
+        blockNumber: blockTag === 'latest' ? undefined : blockTag 
+      });
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: stringify({
+              hash: block.hash,
+              number: block.number,
+              timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
+              gasUsed: block.gasUsed.toString(),
+              transactions: block.transactions.length,
+              miner: block.miner,
+            }, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error getting block:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to retrieve block information. Error: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
+);
+
+server.tool(
+  "get-tx-receipt",
+  "Get detailed transaction receipt from Monad testnet",
+  {
+    txHash: z.string().describe("Transaction hash to get receipt for"),
+  },
+  async ({ txHash }) => {
+    try {
+      const receipt = await publicClient.getTransactionReceipt({
+        hash: txHash as `0x${string}`,
+      });
+
+      if (!receipt) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No receipt found for transaction: ${txHash}`,
+            },
+          ],
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: stringify({
+              status: receipt.status === 'success' ? 'Success' : 'Failed',
+              blockNumber: receipt.blockNumber.toString(),
+              gasUsed: receipt.gasUsed.toString(),
+              effectiveGasPrice: formatUnits(receipt.effectiveGasPrice, 9) + ' Gwei',
+              cumulativeGasUsed: receipt.cumulativeGasUsed.toString(),
+              logs: receipt.logs.length,
+              contractAddress: receipt.contractAddress, // null if not contract creation
+            }, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error getting transaction receipt:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to retrieve transaction receipt. Error: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
+        ],
+      };
+    }
+  }
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
