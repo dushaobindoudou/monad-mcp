@@ -6,11 +6,9 @@ This is a Model Context Protocol (MCP) server that provides tools for interactin
 
 This MCP provides the following tools:
 
-1. **get-monad-balance** - Get MON balance for an Monad address on Monad testnet
-2. **get-latest-block** - Get information about the latest block on Monad testnet
-3. **get-transaction** - Get information about a transaction on Monad testnet
-4. **get-gas-price** - Get current gas price on Monad testnet
-5. **get-erc20-balance** - Get ERC20 token balance for an address on Monad testnet
+1. **get-mon-balance** - Get MON balance for an Monad address on Monad testnet
+2. **get-transaction** - Get information about a transaction on Monad testnet
+3. **get-erc20-balance** - Get ERC20 token balance for an address on Monad testnet
 
 ## Installation
 
@@ -32,10 +30,24 @@ Install dependencies:
 npm install
 ```
 
-This project skips the build step and uses `tsx` to run the script. Make sure to install `tsx` globally:
+## Running the Server
+
+You can run the server directly with:
 
 ```bash
-npm install -g tsx
+npm start
+```
+
+For development with auto-restart on file changes:
+
+```bash
+npm run dev
+```
+
+To build the TypeScript code:
+
+```bash
+npm run build
 ```
 
 ### Claude Desktop Configuration

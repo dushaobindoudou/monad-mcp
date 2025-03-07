@@ -1,8 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { createPublicClient, formatUnits, getContract, http, stringify } from "viem";
-import {  monadTestnet } from "./constants.js";
+import {
+  createPublicClient,
+  formatUnits,
+  getContract,
+  http,
+  stringify,
+} from "viem";
+import { ERC20_ABI, monadTestnet } from "./constants.js";
+
+const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 
 const server = new McpServer({
   name: "monad-testnet",
@@ -18,7 +26,13 @@ server.tool(
   "get-mon-balance",
   "Get MON balance for an address on Monad testnet",
   {
-    address: z.string().describe("Monad testnet address to check balance for"),
+    address: z
+      .string()
+      .regex(
+        ethereumAddressRegex,
+        "Invalid Ethereum address format. Must be a 0x-prefixed 40-character hex string."
+      )
+      .describe("Monad testnet address to check balance for"),
   },
   async ({ address }) => {
     try {
@@ -30,7 +44,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Balance for ${address}: ${balance.toString()} MON`,
+            text: `Balance for ${address}: ${formatUnits(balance, 18)} MON`,
           },
         ],
       };
@@ -51,53 +65,16 @@ server.tool(
 );
 
 server.tool(
-  "get-latest-block",
-  "Get information about the latest block on Monad testnet",
-  {},
-  async () => {
-    try {
-      const block = await publicClient.getBlock();
-
-      if (!block) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to retrieve latest block information",
-            },
-          ],
-        };
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: stringify(block, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      console.error("Error getting latest block:", error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Failed to retrieve latest block information. Error: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          },
-        ],
-      };
-    }
-  }
-);
-
-server.tool(
   "get-transaction",
   "Get information about a transaction on Monad testnet",
   {
-    txHash: z.string().describe("Transaction hash to look up"),
+    txHash: z
+      .string()
+      .regex(
+        /^0x[a-fA-F0-9]{64}$/,
+        "Invalid transaction hash format. Must be a 0x-prefixed 64-character hex string."
+      )
+      .describe("Transaction hash to look up"),
   },
   async ({ txHash }) => {
     try {
@@ -144,33 +121,40 @@ server.tool(
   "get-erc20-balance",
   "Get ERC20 token balance for an address on Monad testnet",
   {
-    tokenAddress: z.string().describe("ERC20 token contract address"),
-    walletAddress: z.string().describe("Wallet address to check balance for"),
+    tokenAddress: z
+      .string()
+      .regex(
+        ethereumAddressRegex,
+        "Invalid token address format. Must be a 0x-prefixed 40-character hex string."
+      )
+      .describe("ERC20 token contract address"),
+    walletAddress: z
+      .string()
+      .regex(
+        ethereumAddressRegex,
+        "Invalid wallet address format. Must be a 0x-prefixed 40-character hex string."
+      )
+      .describe("Wallet address to check balance for"),
   },
   async ({ tokenAddress, walletAddress }) => {
     try {
-      // ERC20 standard balanceOf ABI
-      const erc20Abi = [
-        "function balanceOf(address owner) view returns (uint256)",
-        "function decimals() view returns (uint8)",
-        "function symbol() view returns (string)",
-        "function name() view returns (string)",
-      ];
-
       const contract = getContract({
         address: tokenAddress as `0x${string}`,
-        abi: erc20Abi,
+        abi: ERC20_ABI,
         client: publicClient,
       });
 
       const [balance, decimals, symbol, name] = await Promise.all([
-        contract.read.balanceOf([walletAddress]),
+        contract.read.balanceOf([walletAddress as `0x${string}`]),
         contract.read.decimals(),
         contract.read.symbol(),
         contract.read.name(),
       ]);
 
-      const formattedBalance = formatUnits(balance as bigint, decimals as number);
+      const formattedBalance = formatUnits(
+        balance as bigint,
+        decimals as number
+      );
 
       return {
         content: [
