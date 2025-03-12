@@ -314,8 +314,8 @@ mcp-wallet serve
 
 ```bash
 # Clone the repository
-git clone https://github.com/dushaobindoudou/mcp-wallet.git
-cd mcp-wallet
+git clone https://github.com/monad-developers/monad-mcp.git
+cd monad-mcp
 
 # Install dependencies
 npm install

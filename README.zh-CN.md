@@ -330,8 +330,8 @@ mcp-wallet serve
 
 ```bash
 # 克隆仓库
-git clone https://github.com/dushaobindoudou/mcp-wallet.git
-cd mcp-wallet
+git clone https://github.com/monad-developers/monad-mcp.git
+cd monad-mcp
 
 # 安装依赖
 npm install
